@@ -1,11 +1,11 @@
 package row
 
 import (
-	"github.com/K-Phoen/grabana/alert"
 	"github.com/K-Phoen/grabana/gauge"
 	"github.com/K-Phoen/grabana/graph"
 	"github.com/K-Phoen/grabana/heatmap"
 	"github.com/K-Phoen/grabana/logs"
+	alert "github.com/K-Phoen/grabana/ngalert"
 	"github.com/K-Phoen/grabana/singlestat"
 	"github.com/K-Phoen/grabana/stat"
 	"github.com/K-Phoen/grabana/table"
@@ -20,7 +20,7 @@ type Option func(row *Row) error
 // Row represents a dashboard row.
 type Row struct {
 	builder *sdk.Row
-	alerts  []*alert.Alert
+	Alerts  []*alert.Alert
 }
 
 // New creates a new row.
@@ -42,11 +42,6 @@ func defaults() []Option {
 	}
 }
 
-// Alerts returns a list of alerts defined within this row.
-func (row *Row) Alerts() []*alert.Alert {
-	return row.alerts
-}
-
 // WithGraph adds a "graph" panel in the row.
 // Deprecated: use WithTimeSeries() instead.
 func WithGraph(title string, options ...graph.Option) Option {
@@ -57,16 +52,6 @@ func WithGraph(title string, options ...graph.Option) Option {
 		}
 
 		row.builder.Add(panel.Builder)
-
-		if panel.Alert == nil {
-			return nil
-		}
-
-		if panel.Builder.Datasource != nil {
-			panel.Alert.Datasource = panel.Builder.Datasource.LegacyName
-		}
-
-		row.alerts = append(row.alerts, panel.Alert)
 
 		return nil
 	}
@@ -82,15 +67,10 @@ func WithTimeSeries(title string, options ...timeseries.Option) Option {
 
 		row.builder.Add(panel.Builder)
 
-		if panel.Alert == nil {
-			return nil
+		for _, ngAlert := range panel.Alerts {
+			ngAlert.RefPanelTitle = &panel.Builder.Title
+			row.Alerts = append(row.Alerts, ngAlert)
 		}
-
-		if panel.Builder.Datasource != nil {
-			panel.Alert.Datasource = panel.Builder.Datasource.LegacyName
-		}
-
-		row.alerts = append(row.alerts, panel.Alert)
 
 		return nil
 	}

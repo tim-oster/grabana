@@ -2,10 +2,9 @@ package timeseries
 
 import (
 	"fmt"
-
+	alert "github.com/K-Phoen/grabana/ngalert"
 	"github.com/K-Phoen/sdk"
 
-	"github.com/K-Phoen/grabana/alert"
 	"github.com/K-Phoen/grabana/errors"
 	"github.com/K-Phoen/grabana/links"
 	"github.com/K-Phoen/grabana/scheme"
@@ -124,7 +123,7 @@ const (
 // TimeSeries represents a time series panel.
 type TimeSeries struct {
 	Builder *sdk.Panel
-	Alert   *alert.Alert
+	Alerts  []*alert.Alert
 }
 
 // New creates a new time series panel.
@@ -407,11 +406,19 @@ func Transparent() Option {
 	}
 }
 
-// Alert creates an alert for this graph.
+// Alert creates a next generation alert (grafana unified alerting) for this graph.
 func Alert(name string, opts ...alert.Option) Option {
 	return func(timeseries *TimeSeries) error {
-		timeseries.Alert = alert.New(timeseries.Builder.Title, append(opts, alert.Summary(name))...)
-		timeseries.Alert.Builder.Name = timeseries.Builder.Title
+		obj := alert.New(name, opts...)
+
+		for i, data := range obj.Builder.Data {
+			if data.DatasourceUid == "" {
+				data.DatasourceUid = timeseries.Builder.Datasource.LegacyName
+				obj.Builder.Data[i] = data
+			}
+		}
+
+		timeseries.Alerts = append(timeseries.Alerts, obj)
 
 		return nil
 	}

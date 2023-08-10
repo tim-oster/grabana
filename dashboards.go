@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	alert "github.com/K-Phoen/grabana/ngalert"
 	"net/http"
 	"net/url"
 	"strings"
@@ -62,7 +63,7 @@ func (client *Client) GetDashboardByTitle(ctx context.Context, title string) (*D
 }
 
 // GetDashboardByUID finds a dashboard, given its UID.
-func (client *Client) rawDashboardByUID(ctx context.Context, uid string) (*sdk.Board, error) {
+func (client *Client) GetDashboardByUID(ctx context.Context, uid string) (*sdk.Board, error) {
 	resp, err := client.get(ctx, "/api/dashboards/uid/"+url.PathEscape(uid))
 	if err != nil {
 		return nil, err
@@ -96,43 +97,58 @@ func (client *Client) UpsertDashboard(ctx context.Context, folder *Folder, build
 		return nil, err
 	}
 
-	dashboardFromGrafana, err := client.rawDashboardByUID(ctx, dashboardModel.UID)
+	dashboardFromGrafana, err := client.GetDashboardByUID(ctx, dashboardModel.UID)
 	if err != nil {
 		return nil, err
 	}
 
 	// second pass: delete existing alerts associated to that dashboard
-	alertRefs, err := client.listAlertsForDashboard(ctx, dashboardModel.UID)
+	alertRefs, err := client.ListAlertsForDashboard(ctx, dashboardModel.UID)
 	if err != nil {
 		return nil, fmt.Errorf("could not prepare deletion of previous alerts for dashboard: %w", err)
 	}
+	alertByTitle := map[string]alertRef{}
 	for _, ref := range alertRefs {
-		if err := client.DeleteAlertGroup(ctx, ref.Namespace, ref.RuleGroup); err != nil {
-			return nil, fmt.Errorf("could not delete previous alerts for dashboard: %w", err)
+		if ref.RuleGroup != dashboardFromGrafana.Title || ref.FolderUid != folder.UID {
+			// only delete alerts that are in the same folder and rule group
+			continue
 		}
+		alertByTitle[strings.ToLower(ref.Title)] = ref
 	}
 
 	// third pass: create new alerts
-	alerts := builder.Alerts()
-
-	// If there are no alerts to create, we can return early
-	if len(alerts) == 0 {
-		return dashboardModel, nil
-	}
-
 	datasourcesMap, err := client.datasourcesUIDMap(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	for i := range alerts {
-		alert := *alerts[i]
+	for i := range builder.Alerts {
+		alertObj := *builder.Alerts[i]
 
-		alert.HookDashboardUID(dashboardFromGrafana.UID)
-		alert.HookPanelID(panelIDByTitle(dashboardFromGrafana, alert.Builder.Name))
+		if alertObj.RefPanelTitle != nil {
+			alertObj.HookDashboardUID(dashboardFromGrafana.UID)
+			alertObj.HookPanelID(panelIDByTitle(dashboardFromGrafana, *alertObj.RefPanelTitle))
+		} else {
+			alert.Annotate(customDashboardRefKey, dashboardFromGrafana.UID)(&alertObj)
+		}
 
-		if err := client.AddAlert(ctx, folder.Title, alert, datasourcesMap); err != nil {
-			return nil, fmt.Errorf("could not add new alerts for dashboard: %w", err)
+		// do not allow alerts to be in a custom folder or rule group
+		alertObj.Builder.RuleGroup = dashboardFromGrafana.Title
+		alertObj.Builder.FolderUID = folder.UID
+
+		if ref, ok := alertByTitle[strings.ToLower(alertObj.Builder.Title)]; ok {
+			alertObj.Builder.Uid = ref.Uid
+			delete(alertByTitle, strings.ToLower(alertObj.Builder.Title))
+		}
+
+		if err := client.UpsertAlert(ctx, alertObj, datasourcesMap); err != nil {
+			return nil, fmt.Errorf("could not add new alert (%s) for dashboard: %w", alertObj.Builder.Title, err)
+		}
+	}
+
+	for _, ref := range alertByTitle {
+		if err := client.DeleteAlert(ctx, ref.Uid); err != nil {
+			return nil, fmt.Errorf("could not delete alert %s for dashboard: %w", ref.Uid, err)
 		}
 	}
 
@@ -175,13 +191,13 @@ func (client *Client) persistDashboard(ctx context.Context, folder *Folder, buil
 // DeleteDashboard deletes a dashboard given its UID.
 func (client *Client) DeleteDashboard(ctx context.Context, uid string) error {
 	// first: delete existing alerts associated to that dashboard
-	alertRefs, err := client.listAlertsForDashboard(ctx, uid)
+	alertRefs, err := client.ListAlertsForDashboard(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("could not prepare deletion of alerts for dashboard: %w", err)
 	}
 	for _, ref := range alertRefs {
-		if err := client.DeleteAlertGroup(ctx, ref.Namespace, ref.RuleGroup); err != nil {
-			return fmt.Errorf("could not delete alerts for dashboard: %w", err)
+		if err := client.DeleteAlert(ctx, ref.Uid); err != nil {
+			return fmt.Errorf("could not delete alert %s for dashboard: %w", ref.Uid, err)
 		}
 	}
 

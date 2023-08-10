@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	alert "github.com/K-Phoen/grabana/ngalert"
+	"github.com/K-Phoen/grabana/ngalert/expr"
+	"github.com/K-Phoen/grabana/ngalert/query"
+	"github.com/K-Phoen/sdk"
 	"net/http"
 	"os"
 
 	"github.com/K-Phoen/grabana"
-	"github.com/K-Phoen/grabana/alert"
 	"github.com/K-Phoen/grabana/dashboard"
 	"github.com/K-Phoen/grabana/row"
 	"github.com/K-Phoen/grabana/stat"
@@ -18,7 +21,7 @@ import (
 	"github.com/K-Phoen/grabana/timeseries/axis"
 	"github.com/K-Phoen/grabana/variable/custom"
 	"github.com/K-Phoen/grabana/variable/interval"
-	"github.com/K-Phoen/grabana/variable/query"
+	varquery "github.com/K-Phoen/grabana/variable/query"
 )
 
 func main() {
@@ -56,9 +59,9 @@ func main() {
 		),
 		dashboard.VariableAsQuery(
 			"status",
-			query.DataSource("Prometheus"),
-			query.Request("label_values(prometheus_http_requests_total, code)"),
-			query.Sort(query.NumericalAsc),
+			varquery.DataSource("Prometheus"),
+			varquery.Request("label_values(prometheus_http_requests_total, code)"),
+			varquery.Sort(varquery.NumericalAsc),
 		),
 		dashboard.VariableAsCustom(
 			"percentile",
@@ -115,15 +118,11 @@ func main() {
 					"Too many heap allocations",
 					alert.Description("Yup, too much of {{ app }}"),
 					alert.Runbook("https://google.com"),
-					alert.Tags(map[string]string{
-						"service": "amazing-service",
-						"owner":   "team-b",
-					}),
-					alert.WithPrometheusQuery(
-						"A",
-						"sum(go_memstats_heap_alloc_bytes{app!=\"\"}) by (app)",
-					),
-					alert.If(alert.Avg, "A", alert.IsAbove(3)),
+					alert.Label("service", "amazing-service"),
+					alert.Label("owner", "team-b"),
+					alert.Query("A", query.Datasource("Prometheus"), query.Expr(`sum(go_memstats_heap_alloc_bytes{app!=""}) by (app)`)),
+					alert.Expr("B", expr.Reduce("A", sdk.ReducerFuncMean)),
+					alert.Expr("C", expr.Threshold("B", expr.Gt(3)), expr.AlertCondition()),
 				),
 			),
 			row.WithTable(

@@ -1,4 +1,4 @@
-# github.com/K-Phoen/sdk v0.12.2
+# github.com/K-Phoen/sdk v0.12.2 => github.com/tim-oster/grabana-sdk v0.0.0-20230810132613-64e6505ef401
 ## explicit; go 1.19
 github.com/K-Phoen/sdk
 # github.com/blang/semver v3.5.1+incompatible
@@ -115,3 +115,4 @@ google.golang.org/protobuf/types/descriptorpb
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# github.com/K-Phoen/sdk => github.com/tim-oster/grabana-sdk v0.0.0-20230810132613-64e6505ef401

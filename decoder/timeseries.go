@@ -67,12 +67,13 @@ func (timeseriesPanel DashboardTimeSeries) toOption() (row.Option, error) {
 		opts = append(opts, timeseries.Legend(legendOpts...))
 	}
 	if timeseriesPanel.Alert != nil {
-		alertOpts, err := timeseriesPanel.Alert.toOptions()
-		if err != nil {
-			return nil, err
-		}
-
-		opts = append(opts, timeseries.Alert(timeseriesPanel.Alert.Summary, alertOpts...))
+		// deprecated alerts
+		//alertOpts, err := timeseriesPanel.Alert.toOptions()
+		//if err != nil {
+		//	return nil, err
+		//}
+		//
+		//opts = append(opts, timeseries.Alert(timeseriesPanel.Alert.Summary, alertOpts...))
 	}
 	if timeseriesPanel.Visualization != nil {
 		vizOpts, err := timeseriesPanel.Visualization.toOptions()

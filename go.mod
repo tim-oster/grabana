@@ -12,6 +12,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+replace github.com/K-Phoen/sdk => github.com/tim-oster/grabana-sdk v0.0.0-20230810132613-64e6505ef401
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect

@@ -4,20 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	alert "github.com/K-Phoen/grabana/ngalert"
 	"net/http"
 	"net/url"
 
-	"github.com/K-Phoen/grabana/alert"
 	"github.com/K-Phoen/grabana/alertmanager"
 	"github.com/K-Phoen/sdk"
 )
+
+// Api doc: https://editor.swagger.io/?url=https://raw.githubusercontent.com/grafana/grafana/main/pkg/services/ngalert/api/tooling/api.json
+
+const customDashboardRefKey = "customDashboardRef"
 
 // ErrAlertNotFound is returned when the requested alert can not be found.
 var ErrAlertNotFound = errors.New("alert not found")
 
 type alertRef struct {
-	Namespace string
+	Uid       string
+	Title     string
+	FolderUid string
 	RuleGroup string
 }
 
@@ -42,69 +47,9 @@ func (client *Client) ConfigureAlertManager(ctx context.Context, manager *alertm
 	return nil
 }
 
-// AddAlert creates an alert group within a given namespace.
-func (client *Client) AddAlert(ctx context.Context, namespace string, alertDefinition alert.Alert, datasourcesMap map[string]string) error {
-	// Find out which datasource the alert depends on, and inject its UID into the sdk definition
-	datasource := defaultDatasourceKey
-	if alertDefinition.Datasource != "" {
-		datasource = alertDefinition.Datasource
-	}
-
-	datasourceUID := datasourcesMap[datasource]
-	if datasourceUID == "" {
-		return fmt.Errorf("could not infer datasource UID from its name: %s", datasource)
-	}
-
-	alertDefinition.HookDatasourceUID(datasourceUID)
-
-	// Before we can add this alert, we need to delete any other alert that might exist for this dashboard and panel
-	if err := client.DeleteAlertGroup(ctx, namespace, alertDefinition.Builder.Name); err != nil && err != ErrAlertNotFound {
-		return fmt.Errorf("could not delete existing alerts: %w", err)
-	}
-
-	buf, err := json.Marshal(alertDefinition.Builder)
-	if err != nil {
-		return err
-	}
-
-	// Save the alert!
-	resp, err := client.sendJSON(ctx, http.MethodPost, "/api/ruler/grafana/api/v1/rules/"+url.PathEscape(namespace), buf)
-	if err != nil {
-		return err
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusAccepted {
-		return client.httpError(resp)
-	}
-
-	return nil
-}
-
-// DeleteAlertGroup deletes an alert group.
-func (client *Client) DeleteAlertGroup(ctx context.Context, namespace string, groupName string) error {
-	deleteURL := fmt.Sprintf("/api/ruler/grafana/api/v1/rules/%s/%s", url.PathEscape(namespace), url.PathEscape(groupName))
-	resp, err := client.delete(ctx, deleteURL)
-	if err != nil {
-		return err
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return ErrAlertNotFound
-	}
-	if resp.StatusCode != http.StatusAccepted {
-		return client.httpError(resp)
-	}
-
-	return nil
-}
-
-// listAlertsForDashboard fetches a list of alerts linked to the given dashboard.
-func (client *Client) listAlertsForDashboard(ctx context.Context, dashboardUID string) ([]alertRef, error) {
-	resp, err := client.get(ctx, "/api/ruler/grafana/api/v1/rules?dashboard_uid="+url.QueryEscape(dashboardUID))
+// ListAlertsForDashboard fetches a list of alerts linked to the given dashboard.
+func (client *Client) ListAlertsForDashboard(ctx context.Context, dashboardUID string) ([]alertRef, error) {
+	resp, err := client.get(ctx, "/api/v1/provisioning/alert-rules")
 	if err != nil {
 		return nil, err
 	}
@@ -115,21 +60,75 @@ func (client *Client) listAlertsForDashboard(ctx context.Context, dashboardUID s
 		return nil, client.httpError(resp)
 	}
 
-	var alerts map[string][]sdk.Alert
+	var alerts []sdk.NgAlert
 	if err := decodeJSON(resp.Body, &alerts); err != nil {
 		return nil, err
 	}
 
 	var refs []alertRef
-
-	for namespace := range alerts {
-		for _, a := range alerts[namespace] {
-			refs = append(refs, alertRef{
-				Namespace: namespace,
-				RuleGroup: a.Name,
-			})
+	for _, a := range alerts {
+		uid := a.Annotations["__dashboardUid__"]
+		if uid == "" {
+			uid = a.Annotations[customDashboardRefKey]
 		}
+		if uid != dashboardUID {
+			continue
+		}
+		refs = append(refs, alertRef{
+			Uid:       a.Uid,
+			Title:     a.Title,
+			FolderUid: a.FolderUID,
+			RuleGroup: a.RuleGroup,
+		})
+	}
+	return refs, nil
+}
+
+func (client *Client) UpsertAlert(ctx context.Context, alertDefinition alert.Alert, datasourcesMap map[string]string) error {
+	err := alertDefinition.HookDatasource(datasourcesMap)
+	if err != nil {
+		return err
 	}
 
-	return refs, nil
+	buf, err := json.Marshal(alertDefinition.Builder)
+	if err != nil {
+		return err
+	}
+
+	var (
+		method = http.MethodPost
+		path   = "/api/v1/provisioning/alert-rules"
+	)
+	if alertDefinition.Builder.Uid != "" {
+		method = http.MethodPut
+		path += "/" + url.PathEscape(alertDefinition.Builder.Uid)
+	}
+
+	resp, err := client.sendJSON(ctx, method, path, buf)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return client.httpError(resp)
+	}
+
+	return nil
+}
+
+func (client *Client) DeleteAlert(ctx context.Context, uid string) error {
+	resp, err := client.delete(ctx, "/api/v1/provisioning/alert-rules/"+url.PathEscape(uid))
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return client.httpError(resp)
+	}
+
+	return nil
 }

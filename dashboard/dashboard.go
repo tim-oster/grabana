@@ -6,8 +6,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
-
-	"github.com/K-Phoen/grabana/alert"
+	alert "github.com/K-Phoen/grabana/ngalert"
 	"github.com/K-Phoen/grabana/row"
 	"github.com/K-Phoen/grabana/variable/constant"
 	"github.com/K-Phoen/grabana/variable/custom"
@@ -48,7 +47,7 @@ const Browser TimezoneOption = "browser"
 // Builder is the main builder used to configure dashboards.
 type Builder struct {
 	board  *sdk.Board
-	alerts []*alert.Alert
+	Alerts []*alert.Alert
 }
 
 // New creates a new dashboard builder.
@@ -103,11 +102,6 @@ func (builder *Builder) MarshalJSON() ([]byte, error) {
 // See https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards
 func (builder *Builder) MarshalIndentJSON() ([]byte, error) {
 	return json.MarshalIndent(builder.board, "", "  ")
-}
-
-// Alerts returns all the alerts defined in this dashboard.
-func (builder *Builder) Alerts() []*alert.Alert {
-	return builder.alerts
 }
 
 // Internal.
@@ -257,7 +251,7 @@ func Row(title string, options ...row.Option) Option {
 			return err
 		}
 
-		builder.alerts = append(builder.alerts, r.Alerts()...)
+		builder.Alerts = append(builder.Alerts, r.Alerts...)
 
 		return nil
 	}
@@ -347,6 +341,16 @@ func Time(from, to string) Option {
 func Timezone(timezone TimezoneOption) Option {
 	return func(builder *Builder) error {
 		builder.board.Timezone = string(timezone)
+
+		return nil
+	}
+}
+
+// Alert creates a next generation alert (grafana unified alerting) for this graph.
+func Alert(name string, opts ...alert.Option) Option {
+	return func(builder *Builder) error {
+		ngAlert := alert.New(name, opts...)
+		builder.Alerts = append(builder.Alerts, ngAlert)
 
 		return nil
 	}
