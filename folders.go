@@ -67,8 +67,8 @@ func (client *Client) CreateFolder(ctx context.Context, name string) (*Folder, e
 	return &folder, nil
 }
 
-// GetFolderByTitle finds a folder, given its title.
-func (client *Client) GetFolderByTitle(ctx context.Context, title string) (*Folder, error) {
+// ListFolders returns all folders.
+func (client *Client) ListFolders(ctx context.Context) ([]Folder, error) {
 	resp, err := client.get(ctx, "/api/folders?limit=1000")
 	if err != nil {
 		return nil, err
@@ -84,6 +84,15 @@ func (client *Client) GetFolderByTitle(ctx context.Context, title string) (*Fold
 	if err := decodeJSON(resp.Body, &folders); err != nil {
 		return nil, err
 	}
+	return folders, nil
+}
+
+// GetFolderByTitle finds a folder, given its title.
+func (client *Client) GetFolderByTitle(ctx context.Context, title string) (*Folder, error) {
+	folders, err := client.ListFolders(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	for i := range folders {
 		if strings.EqualFold(folders[i].Title, title) {
@@ -92,4 +101,21 @@ func (client *Client) GetFolderByTitle(ctx context.Context, title string) (*Fold
 	}
 
 	return nil, ErrFolderNotFound
+}
+
+// DeleteFolder deletes the given folder and its dashboards. If deleteAlertRules is true, the alert rules are also
+// deleted. Otherwise, deletion fails if the folder contains alert rules.
+func (client *Client) DeleteFolder(ctx context.Context, uid string, deleteAlertRules bool) error {
+	resp, err := client.delete(ctx, fmt.Sprintf("/api/folders/%s?forceDeleteRules=%t", uid, deleteAlertRules))
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return client.httpError(resp)
+	}
+
+	return nil
 }
