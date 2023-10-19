@@ -1,6 +1,7 @@
 package row
 
 import (
+	"github.com/K-Phoen/grabana/custom"
 	"github.com/K-Phoen/grabana/gauge"
 	"github.com/K-Phoen/grabana/graph"
 	"github.com/K-Phoen/grabana/heatmap"
@@ -61,6 +62,25 @@ func WithGraph(title string, options ...graph.Option) Option {
 func WithTimeSeries(title string, options ...timeseries.Option) Option {
 	return func(row *Row) error {
 		panel, err := timeseries.New(title, options...)
+		if err != nil {
+			return err
+		}
+
+		row.builder.Add(panel.Builder)
+
+		for _, ngAlert := range panel.Alerts {
+			ngAlert.RefPanelTitle = &panel.Builder.Title
+			row.Alerts = append(row.Alerts, ngAlert)
+		}
+
+		return nil
+	}
+}
+
+// WithCustom adds a "custom" panel in the row.
+func WithCustom(title string, options ...custom.Option) Option {
+	return func(row *Row) error {
+		panel, err := custom.New(title, options...)
 		if err != nil {
 			return err
 		}
