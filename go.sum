@@ -59,6 +59,8 @@ github.com/tcnksm/go-gitconfig v0.1.2 h1:iiDhRitByXAEyjgBqsKi9QU4o2TNtv9kPP3RgPg
 github.com/tcnksm/go-gitconfig v0.1.2/go.mod h1:/8EhP4H7oJZdIPyT+/UIsG87kTzrzM4UsLGSItWYCpE=
 github.com/tim-oster/grabana-sdk v0.0.0-20230810132613-64e6505ef401 h1:bVIOrumpPZtDCyPBpBoKHKsy4nXQ7HflWcxQ/6Tv3aI=
 github.com/tim-oster/grabana-sdk v0.0.0-20230810132613-64e6505ef401/go.mod h1:qmM0wO23CtoDux528MXPpYvS4XkRWkWX6rvX9Za8EVU=
+github.com/tim-oster/grabana-sdk v0.0.0-20231019222609-91fbde796ad9 h1:+nFVfAgrf4AiefuQ//Uqy7nIFxL+p6ICgAcTbJP6HMw=
+github.com/tim-oster/grabana-sdk v0.0.0-20231019222609-91fbde796ad9/go.mod h1:qmM0wO23CtoDux528MXPpYvS4XkRWkWX6rvX9Za8EVU=
 github.com/ulikunitz/xz v0.5.9/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
 github.com/ulikunitz/xz v0.5.11 h1:kpFauv27b6ynzBNT/Xy+1k+fK4WswhN/6PN5WhFAGw8=
 github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=

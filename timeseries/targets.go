@@ -1,6 +1,7 @@
 package timeseries
 
 import (
+	"github.com/K-Phoen/grabana/target/azuremonitor"
 	"github.com/K-Phoen/grabana/target/graphite"
 	"github.com/K-Phoen/grabana/target/influxdb"
 	"github.com/K-Phoen/grabana/target/loki"
@@ -71,6 +72,16 @@ func WithLokiTarget(query string, options ...loki.Option) Option {
 			Expr:         target.Expr,
 			LegendFormat: target.LegendFormat,
 		})
+
+		return nil
+	}
+}
+
+func WithAzureMonitorTarget(agg azuremonitor.Aggregation, metricNamespace, metricName, region string, options ...azuremonitor.Option) Option {
+	target := azuremonitor.New(agg, metricNamespace, metricName, region, options...)
+
+	return func(graph *TimeSeries) error {
+		graph.Builder.AddTarget(target.Builder)
 
 		return nil
 	}

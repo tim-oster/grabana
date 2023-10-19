@@ -2,15 +2,15 @@ package expr
 
 import "github.com/K-Phoen/sdk"
 
-type Option func(query *Query)
+type Option func(expr *Expr)
 
-type Query struct {
+type Expr struct {
 	Builder          *sdk.NgAlertQuery
 	IsAlertCondition bool
 }
 
-func New(refId string, options ...Option) *Query {
-	query := &Query{
+func New(refId string, options ...Option) *Expr {
+	expr := &Expr{
 		Builder: &sdk.NgAlertQuery{
 			RefId:             refId,
 			RelativeTimeRange: sdk.RelativeTimeRange{},
@@ -30,33 +30,33 @@ func New(refId string, options ...Option) *Query {
 		IsAlertCondition: false,
 	}
 	for _, opt := range options {
-		opt(query)
+		opt(expr)
 	}
 
-	if query.Builder.Model.NgAlertQueryModelExpression.Cmd.Type == "" {
+	if expr.Builder.Model.NgAlertQueryModelExpression.Cmd.Type == "" {
 		panic("invalid model command")
 	}
 
-	return query
+	return expr
 }
 
 func AlertCondition() Option {
-	return func(query *Query) {
-		query.IsAlertCondition = true
+	return func(expr *Expr) {
+		expr.IsAlertCondition = true
 	}
 }
 
-func Math(expr string) Option {
-	return func(query *Query) {
-		query.Builder.Model.NgAlertQueryModelExpression.Cmd = sdk.NgAlertQueryModelCommand{
+func Math(exprStr string) Option {
+	return func(expr *Expr) {
+		expr.Builder.Model.NgAlertQueryModelExpression.Cmd = sdk.NgAlertQueryModelCommand{
 			Type:        sdk.CommandTypeMath,
-			MathCommand: &sdk.MathCommand{Expression: expr},
+			MathCommand: &sdk.MathCommand{Expression: exprStr},
 		}
 	}
 }
 
 func Reduce(refId string, reducer sdk.ReducerFunc, opts ...ReducerOption) Option {
-	return func(query *Query) {
+	return func(expr *Expr) {
 		cmd := &sdk.ReduceCommand{
 			Expression: refId,
 			Reducer:    reducer,
@@ -64,7 +64,7 @@ func Reduce(refId string, reducer sdk.ReducerFunc, opts ...ReducerOption) Option
 		for _, opt := range opts {
 			opt(cmd)
 		}
-		query.Builder.Model.NgAlertQueryModelExpression.Cmd = sdk.NgAlertQueryModelCommand{
+		expr.Builder.Model.NgAlertQueryModelExpression.Cmd = sdk.NgAlertQueryModelCommand{
 			Type:          sdk.CommandTypeReduce,
 			ReduceCommand: cmd,
 		}
@@ -91,8 +91,8 @@ func ReduceReplaceNaN(with float64) ReducerOption {
 }
 
 func Resample(refId, window string, down sdk.ResampleDownSampler, up sdk.ResampleUpSampler) Option {
-	return func(query *Query) {
-		query.Builder.Model.NgAlertQueryModelExpression.Cmd = sdk.NgAlertQueryModelCommand{
+	return func(expr *Expr) {
+		expr.Builder.Model.NgAlertQueryModelExpression.Cmd = sdk.NgAlertQueryModelCommand{
 			Type: sdk.CommandTypeResample,
 			ResampleCommand: &sdk.ResampleCommand{
 				Expression:  refId,
@@ -105,12 +105,12 @@ func Resample(refId, window string, down sdk.ResampleDownSampler, up sdk.Resampl
 }
 
 func Threshold(refId string, opt ThresholdOption) Option {
-	return func(query *Query) {
+	return func(expr *Expr) {
 		cmd := &sdk.ThresholdCommand{
 			Expression: refId,
 		}
 		opt(cmd)
-		query.Builder.Model.NgAlertQueryModelExpression.Cmd = sdk.NgAlertQueryModelCommand{
+		expr.Builder.Model.NgAlertQueryModelExpression.Cmd = sdk.NgAlertQueryModelCommand{
 			Type:             sdk.CommandTypeThreshold,
 			ThresholdCommand: cmd,
 		}

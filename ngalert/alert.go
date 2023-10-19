@@ -2,7 +2,7 @@ package alert
 
 import (
 	"fmt"
-
+	"github.com/K-Phoen/grabana/ngalert/azure"
 	"github.com/K-Phoen/grabana/ngalert/expr"
 	"github.com/K-Phoen/grabana/ngalert/query"
 	"github.com/K-Phoen/sdk"
@@ -156,6 +156,17 @@ func Expr(refId string, opts ...expr.Option) Option {
 		alert.Builder.Data = append(alert.Builder.Data, *e.Builder)
 
 		if e.IsAlertCondition {
+			alert.Builder.Condition = refId
+		}
+	}
+}
+
+func AzureMonitor(refId string, target *sdk.AzureMonitorTarget) Option {
+	return func(alert *Alert) {
+		q := azure.New(refId, target)
+		alert.Builder.Data = append(alert.Builder.Data, *q.Builder)
+
+		if q.IsAlertCondition {
 			alert.Builder.Condition = refId
 		}
 	}
