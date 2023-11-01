@@ -158,11 +158,11 @@ func (client *Client) UpsertDashboard(ctx context.Context, folder *Folder, build
 func (client *Client) persistDashboard(ctx context.Context, folder *Folder, builder dashboard.Builder) (*Dashboard, error) {
 	buf, err := json.Marshal(struct {
 		Dashboard *sdk.Board `json:"dashboard"`
-		FolderID  uint       `json:"folderId"`
+		FolderUID string     `json:"folderUid"`
 		Overwrite bool       `json:"overwrite"`
 	}{
 		Dashboard: builder.Internal(),
-		FolderID:  folder.ID,
+		FolderUID: folder.UID,
 		Overwrite: true,
 	})
 	if err != nil {
