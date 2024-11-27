@@ -91,6 +91,13 @@ func (client *Client) GetDashboardByUID(ctx context.Context, uid string) (*sdk.B
 
 // UpsertDashboard creates or replaces a dashboard, in the given folder.
 func (client *Client) UpsertDashboard(ctx context.Context, folder *Folder, builder dashboard.Builder) (*Dashboard, error) {
+	// optionally search for the dashboard by title to get its ID
+	dashboardId, err := client.searchDashboardByTitle(ctx, folder, builder.Internal().Title)
+	if err != nil {
+		return nil, err
+	}
+	builder.Internal().ID = dashboardId
+
 	// first pass: save the new dashboard
 	dashboardModel, err := client.persistDashboard(ctx, folder, builder)
 	if err != nil {
@@ -153,6 +160,35 @@ func (client *Client) UpsertDashboard(ctx context.Context, folder *Folder, build
 	}
 
 	return dashboardModel, nil
+}
+
+func (client *Client) searchDashboardByTitle(ctx context.Context, folder *Folder, title string) (uint, error) {
+	resp, err := client.get(ctx, "/api/search?folderUIDs="+url.QueryEscape(folder.UID)+"&type=dash-db&query="+url.QueryEscape(title))
+	if err != nil {
+		return 0, err
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, client.httpError(resp)
+	}
+
+	var data []struct {
+		ID    uint   `json:"id"`
+		UID   string `json:"uid"`
+		Title string `json:"title"`
+	}
+	if err := decodeJSON(resp.Body, &data); err != nil {
+		return 0, err
+	}
+	for _, d := range data {
+		if d.Title == title {
+			return d.ID, nil
+		}
+	}
+
+	return 0, nil
 }
 
 func (client *Client) persistDashboard(ctx context.Context, folder *Folder, builder dashboard.Builder) (*Dashboard, error) {
